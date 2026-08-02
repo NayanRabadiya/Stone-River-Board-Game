@@ -66,7 +66,7 @@ Where *n* = opponent's stones already in scoring area, *m* = opponent's stones r
 ## Project Structure
 
 ```
-A2/
+Stone-River-Board-Game/
 ├── gameEngine.py       # Game engine — runs locally with GUI or CLI
 ├── agent.py            # Baseline random agent
 ├── student_agent.py    # Custom AI agent (implemented)
