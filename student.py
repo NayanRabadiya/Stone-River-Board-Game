@@ -115,10 +115,10 @@ def is_goal_side_rows(fx,fy,player,rows,cols,score_cols)->bool:
     """
     
     # goal side 5 rows
-    if player == "circle":  # suppose Player 1 scores at right
-        return fx <= 4
-    else:  # Player 2 scores at left
-        return fx >= rows - 5 
+    if player == "circle":  # circle scores at top rows
+        return fy <= 4
+    else:  # square scores at bottom rows
+        return fy >= rows - 5
 
 
 def has_adjacent_river(board, x, y, rows, cols)->bool:
@@ -649,7 +649,7 @@ def eval_dist_to_goal_cols(board,player,rows,cols,score_cols)->float:
             if piece is not None and piece.owner == player and y in goal_side_rows:
                 minS = 1000
                 for col in score_cols:
-                    if board[goal_row][col] is not None:
+                    if board[goal_row][col] is None:
                         minS = min(minS,abs(x-col))
                 if minS != 1000:
                     score+=minS  
@@ -841,27 +841,7 @@ def validate_and_apply_move(
             board[fy][fx] = None
             return True, "moved"
 
-        # Move with push
-        pushed = move.get("pushed_to")
-        if not pushed:
-            return False, "destination occupied; 'pushed_to' required"
-        ptx, pty = int(pushed[0]), int(pushed[1])
-        dx, dy = tx - fx, ty - fy
-
-        if (ptx, pty) != (tx + dx, ty + dy):
-            return False, "'pushed_to' must be in line with move direction"
-        if not in_bounds(ptx, pty, rows, cols):
-            return False, "pushed_to out of bounds"
-        if is_opponent_score_cell(ptx, pty, player, rows, cols, score_cols):
-            return False, "cannot push into opponent score cell"
-        if board[pty][ptx] is not None:
-            return False, "'pushed_to' not empty"
-
-        # Apply move + push
-        board[pty][ptx] = board[ty][tx]  # pushed piece
-        board[ty][tx] = piece            # mover occupies destination
-        board[fy][fx] = None             # origin cleared
-        return True, "move + push applied"
+        return False, "destination occupied; use 'push' action"
 
     # -------------------
     # PUSH ACTION

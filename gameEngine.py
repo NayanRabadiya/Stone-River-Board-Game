@@ -789,6 +789,13 @@ def run_gui(mode:str, circle_strategy:str, square_strategy:str, load_file:Option
 
         # AI turn (single call)
         if players[current] == "ai" and not winner and not game_over:
+            # Pump the event queue so the OS doesn't consider the window
+            # unresponsive while two AIs are playing each other (aivai mode
+            # never reaches the human-input event loop below otherwise).
+            for ev in pygame.event.get():
+                if ev.type == pygame.QUIT:
+                    pygame.quit(); return
+
             ai_start = time.time()
             agent = agents[current]
             move = agent.choose(board, rows, cols, score_cols, timers[current], timers[opponent(current)])
@@ -1159,8 +1166,12 @@ def run_cli(mode:str, circle_strategy:str, square_strategy:str, load_file:Option
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--mode", choices=["hvh","hvai","aivai"], default="hvai")
-    ap.add_argument("--circle", choices=["random","student","student2","student_cpp"], default="random")
-    ap.add_argument("--square", choices=["random","student","student2","student_cpp"], default="random")
+    ap.add_argument("--circle", default="random",
+                     help="Strategy name: 'random' for the built-in random agent, or the name of a "
+                          "'<name>.py' file (e.g. 'student2' loads student2.py) containing an agent class")
+    ap.add_argument("--square", default="random",
+                     help="Strategy name: 'random' for the built-in random agent, or the name of a "
+                          "'<name>.py' file (e.g. 'student2' loads student2.py) containing an agent class")
     ap.add_argument("--load", default=None)
     ap.add_argument("--nogui", action="store_true")
     ap.add_argument("--time", type=float, default=1.0, help="Time per player in minutes (default: 1.0)")

@@ -3,7 +3,7 @@
 River and Stones Game - AI Agent Framework
 
 This module provides the base agent implementations and factory function.
-The student implementation is in student_agent.py for better organization.
+The student implementation is in student.py for better organization.
 
 Game Rules Summary:
 - Two players: Circle (red) and Square (blue)
@@ -15,6 +15,10 @@ Game Rules Summary:
 
 import random
 import copy
+import os
+import sys
+import inspect
+import importlib
 from typing import List, Dict, Any, Optional, Tuple
 from abc import ABC, abstractmethod
 
@@ -554,62 +558,79 @@ class RandomAgent(BaseAgent):
 
 
 
-# ==================== STUDENT AGENT IMPORT ====================
-
-try:
-    from student_agent import StudentAgent
-except ImportError:
-    print("Warning: student_agent.py not found. Creating placeholder StudentAgent.")
-    
-    class StudentAgent(BaseAgent):
-        """Placeholder StudentAgent - implement in student_agent.py"""
-        
-        def choose(self, board: List[List[Any]], rows: int, cols: int, score_cols: List[int], current_player_time: float, opponent_time: float) -> Optional[Dict[str, Any]]:
-            moves = self.generate_all_moves(board, rows, cols, score_cols)
-            return random.choice(moves) if moves else None
-try:
-    from student_agent2 import StudentAgent2
-except ImportError:
-    print("Warning: student_agent2.py not found. Creating placeholder StudentAgent.")
-    
-    class StudentAgent2(BaseAgent):
-        """Placeholder StudentAgent2 - implement in student_agent2.py"""
-        
-        def choose(self, board: List[List[Any]], rows: int, cols: int, score_cols: List[int], current_player_time: float, opponent_time: float) -> Optional[Dict[str, Any]]:
-            moves = self.generate_all_moves(board, rows, cols, score_cols)
-            return random.choice(moves) if moves else None
-
 # ==================== AGENT FACTORY ====================
+
+def _load_agent_class_from_file(name: str):
+    """
+    Look for a file named "<name>.py" next to this module, import it, and
+    return the agent class defined in it.
+
+    Matching is duck-typed (a concrete class defining `choose(...)`) rather
+    than an issubclass(BaseAgent) check, since student files are allowed to
+    define their own standalone BaseAgent/choose contract instead of
+    importing agent.BaseAgent.
+    """
+    search_dir = os.path.dirname(os.path.abspath(__file__))
+    filepath = os.path.join(search_dir, f"{name}.py")
+
+    if not os.path.isfile(filepath):
+        raise ValueError(
+            f"Unknown strategy '{name}': no file '{name}.py' found in {search_dir}"
+        )
+
+    if search_dir not in sys.path:
+        sys.path.insert(0, search_dir)
+
+    try:
+        module = importlib.import_module(name)
+    except ImportError as e:
+        raise ValueError(f"Failed to import agent module '{name}.py': {e}")
+
+    candidates = [
+        obj for _, obj in inspect.getmembers(module, inspect.isclass)
+        if obj.__module__ == module.__name__
+        and not inspect.isabstract(obj)
+        and callable(getattr(obj, "choose", None))
+    ]
+
+    if not candidates:
+        raise ValueError(f"No agent class with a choose() method found in '{name}.py'")
+
+    if len(candidates) > 1:
+        named = [c for c in candidates if "agent" in c.__name__.lower()]
+        if len(named) == 1:
+            candidates = named
+        else:
+            names = ", ".join(c.__name__ for c in candidates)
+            raise ValueError(
+                f"Multiple possible agent classes found in '{name}.py' ({names}); "
+                f"keep exactly one concrete class with a choose() method"
+            )
+
+    return candidates[0]
+
 
 def get_agent(player: str, strategy: str) -> BaseAgent:
     """
     Factory function to create agents based on strategy name.
-    
+
+    "random" maps to the built-in RandomAgent. Any other name is resolved by
+    looking for a file "<strategy>.py" next to this module and instantiating
+    the agent class found inside it, e.g. strategy="student2" loads
+    "student2.py".
+
     Args:
         player: "circle" or "square"
-        strategy: Strategy name ("random", "student")
-    
+        strategy: "random", or the name of a "<strategy>.py" file containing
+                  an agent class
+
     Returns:
         Agent instance
     """
     strategy = strategy.lower()
-    
+
     if strategy == "random":
         return RandomAgent(player)
-    elif strategy == "student":
-        return StudentAgent(player)
-    elif strategy == "student2":
-        return StudentAgent2(player)
-    elif strategy == "student_cpp":
-        try:
-            import student_agent_cpp as student_agent
-            StudentAgentCpp = student_agent.StudentAgent
-        except ImportError:
-            StudentAgentCpp = None
-        if StudentAgentCpp:
-            return StudentAgentCpp(player)
-        else:
-            print("C++ StudentAgent not available. Falling back to Python StudentAgent.")
-            return StudentAgent(player)
-    else:
-        raise ValueError(f"Unknown strategy: {strategy}. Available: random, student")
+
+    agent_class = _load_agent_class_from_file(strategy)
+    return agent_class(player)

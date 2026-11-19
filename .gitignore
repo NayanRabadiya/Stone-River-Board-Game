@@ -2,3 +2,6 @@ __pycache__/
 venv/
 *.pdf
 *.txt
+revise.md
+.gitignore
+.claude
